@@ -1,0 +1,12 @@
+{
+  "name": "goticket",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@10.34.9",
+  "scripts": {
+    "dev": "pnpm --parallel --filter ./apps/api --filter ./apps/web run dev",
+    "dev:api": "pnpm --filter ./apps/api run dev",
+    "dev:web": "pnpm --filter ./apps/web run dev",
+    "build": "pnpm -r --filter ./apps/api --filter ./apps/web run build"
+  }
+}
