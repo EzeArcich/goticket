@@ -14,6 +14,14 @@ export interface Organizer {
   active: boolean
 }
 
+export interface TicketType {
+  id: string
+  name: string
+  description?: string
+  price: number
+  availableTickets: number
+}
+
 export interface Event {
   id: string
   title: string
@@ -31,4 +39,5 @@ export interface Event {
   heroImageUrl?: string
   status: 'published' | 'draft' | 'cancelled'
   availableTickets: number
+  ticketTypes: TicketType[]
 }
