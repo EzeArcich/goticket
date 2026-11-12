@@ -1,28 +1,30 @@
-import {describe, expect, it} from 'vitest';
-import { events } from '../data/events.mock';
-import { filterEventsByCity, normalizeText, filterEventsByTitle } from './event-filters';
+import { describe, expect, it } from 'vitest'
+import { events as mockEvents } from '../features/events/data/events.mock'
+import { filterEventsByCity, normalizeText, filterEventsByTitle } from './event-filters'
 
-describe ('filterEventsByCity', () => {
-    it('returns only events from Córdoba', () => {
-        const result = filterEventsByCity(events, 'Córdoba')
-        
-        expect(result.length).toBe(1)
-        expect(result[0]?.city).toBe('Córdoba')
-    })
+const events = mockEvents.slice(0, 3)
 
-    it('ignores casing and surrounding whitespace', () => {
-        const result = filterEventsByCity(events, '  cÓrDoBa  ')
+describe('filterEventsByCity', () => {
+  it('returns only events from Córdoba', () => {
+    const result = filterEventsByCity(events, 'Córdoba')
 
-        expect(result).toHaveLength(1)
-        expect(result[0]?.city).toBe('Córdoba')
-    })
+    expect(result.length).toBe(1)
+    expect(result[0]?.city).toBe('Córdoba')
+  })
 
-    it('finds cities without requiring accents', () => {
-        const result = filterEventsByCity(events, 'cordoba')
+  it('ignores casing and surrounding whitespace', () => {
+    const result = filterEventsByCity(events, '  cÓrDoBa  ')
 
-        expect(result).toHaveLength(1)
-        expect(result[0]?.city).toBe('Córdoba')
-    })
+    expect(result).toHaveLength(1)
+    expect(result[0]?.city).toBe('Córdoba')
+  })
+
+  it('finds cities without requiring accents', () => {
+    const result = filterEventsByCity(events, 'cordoba')
+
+    expect(result).toHaveLength(1)
+    expect(result[0]?.city).toBe('Córdoba')
+  })
 })
 
 describe('normalizeText', () => {
@@ -72,7 +74,4 @@ describe('filterEventsByTitle', () => {
 
     expect(result).toHaveLength(0)
   })
-
 })
-
-
