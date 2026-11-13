@@ -1,98 +1,146 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# GoTicket — API / KAN-53
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+NestJS 11, PostgreSQL 14 local y Prisma 7.10.1 con `@prisma/adapter-pg`.
+No requiere Docker. Este ticket incorpora persistencia y usuarios, sin registro,
+login, JWT, roles ni organizaciones. El endpoint temporal `GET /users` fue retirado.
+`UsersService` queda disponible para las siguientes entregas y sus pruebas.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## Configuración local
 
-## Description
+Desde la raíz, instalar con `pnpm install --frozen-lockfile`. Luego, en `apps/api`:
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+1. Copiar `.env.example` a `.env` y completar las credenciales locales.
+2. Usar `goticket` como base de desarrollo y `goticket_shadow` como shadow para
+   `prisma migrate dev`. No usar ninguna de ellas para integración.
+3. `pnpm prisma:generate` genera el cliente en `generated/prisma` (ignorado).
+4. `pnpm exec prisma migrate deploy` aplica migraciones pendientes. No ejecutar
+   `migrate reset` sobre la base de desarrollo.
+5. `pnpm prisma:status` comprueba el estado sin modificar usuarios.
+6. `pnpm dev` inicia la API; `GET /health` responde `{ "status": "ok" }`.
 
-## Project setup
+La API, Prisma CLI y el seeder cargan `.env` desde el directorio `apps/api`.
+Las variables exportadas tienen prioridad. El build genera el cliente sin requerir
+conexión a PostgreSQL; iniciar la API sí exige `DATABASE_URL` válida.
 
-```bash
-$ pnpm install
+```sh
+pnpm build
+pnpm start:prod
 ```
 
-## Compile and run the project
+Con el cliente generado fuera de `src`, el entrypoint compilado es
+`dist/src/main.js`. El build incluye `src` y sus imports generados, pero no el
+seeder, la configuración de Prisma ni los tests.
 
-```bash
-# development
-$ pnpm run start
+## Modelo
 
-# watch mode
-$ pnpm run start:dev
+`users`: UUID, email único (`VARCHAR(255)`), `password_hash` (`VARCHAR(255)`),
+`created_at` y `updated_at`. Migración: `20261112201421_create_users`.
+`UsersService.findAll()` selecciona solo `id`, `email` y `createdAt`; nunca retorna
+`passwordHash`. No hay controller público de usuarios.
 
-# production mode
-$ pnpm run start:prod
+La restricción UNIQUE actual respeta la comparación normal de PostgreSQL: no
+normaliza mayúsculas ni espacios del correo. La política de normalización de un
+futuro registro pertenece a su propio ticket.
+
+## Seeder local, opt-in
+
+Configurar **solo en el entorno local o en `.env` ignorado**:
+
+- `NODE_ENV=development` (o `test` para `goticket_test`).
+- `ALLOW_USER_SEED=true` (el ejemplo lo deja deshabilitado).
+- `SEED_USER_PASSWORD`: contraseña local de al menos 12 caracteres y máximo 72
+  bytes UTF-8. No se incluye ninguna contraseña de prueba en el repositorio.
+- `DATABASE_URL`: PostgreSQL local, base `goticket` o `goticket_test`, schema public.
+
+Ejecutar `pnpm seed`. El script rechaza producción, entornos no declarados,
+destinos remotos, shadow y configuraciones incompletas **antes de conectarse**.
+No imprime credenciales ni errores crudos de conexión.
+
+Crea cinco usuarios ficticios con bcrypt (coste 12), mediante upserts en una
+transacción. Repetirlo no cambia IDs, timestamps ni hashes existentes, incluso si
+se cambia la contraseña de seed. No es una herramienta de cambio de contraseñas.
+
+## Tests unitarios y HTTP
+
+Desde la raíz:
+
+```sh
+pnpm --filter ./apps/api test --runInBand
+pnpm --filter ./apps/api test:e2e --runInBand
 ```
 
-## Run tests
+Los unitarios validan la selección de campos, errores y protecciones del seed/test.
+Los HTTP sustituyen únicamente `PrismaService` por un proveedor sin conexión para
+probar `/`, `/health` y la ausencia de `/users`. No se usan para afirmar que UNIQUE
+funciona; esa validación se realiza con PostgreSQL real.
 
-```bash
-# unit tests
-$ pnpm run test
+## Integración PostgreSQL real e independiente
 
-# e2e tests
-$ pnpm run test:e2e
+### Opción recomendada: clúster temporal local
 
-# test coverage
-$ pnpm run test:cov
+Requiere binarios PostgreSQL 14 (`initdb`, `pg_ctl`, `createdb`, `pg_config`), Bash,
+Node y ejecución como usuario normal (PostgreSQL no permite `initdb` como root).
+Desde la raíz:
+
+```sh
+pnpm --filter ./apps/api test:integration:local
 ```
 
-## Deployment
+El runner crea un clúster independiente bajo `/tmp`, en `127.0.0.1:55453`, con
+base `goticket_test`, usuario y contraseña aleatoria de corta duración. Aplica la
+migración, verifica su estado, ejecuta Jest y elimina el clúster al finalizar,
+incluso si fallan los tests. No administra la instancia PostgreSQL del sistema ni
+contenedores. La contraseña se guarda temporalmente con permisos `0600` en un
+directorio privado, sin escribirse en el repositorio.
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+Se pueden definir `PG_BIN` para la ruta de binarios y `TEST_POSTGRES_PORT` para un
+puerto libre. Si el puerto está ocupado, el runner falla sin detener otros servicios.
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+### Alternativa: base de pruebas persistente
 
-```bash
-$ pnpm install -g @nestjs/mau
-$ mau deploy
+Un administrador debe crear **otra base**, con el rol local de la aplicación como
+owner. Sustituir `ROL_LOCAL` por ese nombre, sin incluir contraseñas en comandos:
+
+```sh
+sudo -u postgres createdb --owner=ROL_LOCAL goticket_test
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+Configurar `TEST_DATABASE_URL` en `apps/api/.env.test` (ignorado) con ese destino.
+No se admite `DATABASE_URL` como fallback. Luego:
 
-## Resources
+```sh
+pnpm --filter ./apps/api test:integration
+```
 
-Check out a few resources that may come in handy when working with NestJS:
+Solo acepta PostgreSQL local, base exactamente `goticket_test`, schema public.
+Antes de escribir, el suite verifica también `current_database()` en el servidor.
+Se ejecuta `migrate deploy`, nunca `reset`; el teardown borra solo IDs creados por
+el propio suite. Si los cinco emails del seeder ya existen en esta base, la prueba
+falla sin modificarlos: usar el runner temporal, no borrar datos ajenos.
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+La integración cubre creación/recuperación, hashes bcrypt persistidos y comparación
+de contraseñas, proyección segura, UNIQUE con creaciones concurrentes y seed
+idempotente (incluidos IDs, timestamps y hashes). Las contraseñas de tests se
+generan en memoria. Jest requiere `--experimental-vm-modules` por los imports
+dinámicos del compilador WASM de Prisma 7; el runner lo configura automáticamente.
 
-## Support
+## Validaciones y entrega
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+```sh
+pnpm --filter ./apps/api lint
+pnpm --filter ./apps/api prisma:validate
+pnpm --filter ./apps/api prisma:status
+pnpm --filter ./apps/api build
+git diff --check
+```
 
-## Stay in touch
+Resultado de KAN-53: 28 tests unitarios (30 assertions Jest), 4 de integración
+PostgreSQL (31 assertions) y 3 HTTP (6 assertions): **35 tests, 67 assertions**.
+Build, ESLint sin warnings, validación de esquema y estado de migraciones correctos.
+Se verificó que los cinco usuarios originales de `goticket` conservaran la misma
+huella SHA-256 antes y después, sin exponer sus registros ni hashes.
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+Incluir configuración y código de `apps/api`, migración, tests y el lockfile raíz
+(Prisma y dependencias requieren actualizarlo). No incluir `.env`, `.env.test`,
+credenciales, `generated/`, `dist/`, `coverage/` ni reportes locales de pruebas.
+Los reportes JSON usados para contar assertions quedan en `/tmp`.
