@@ -1,17 +1,22 @@
-
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, useId } from 'vue'
 import type { TicketType } from '../types/event'
 import { formatPrice } from '../../../utils/formatters'
 
 const props = defineProps<{
   tickets: TicketType[]
+  selection?: Record<string, number>
 }>()
 
+const emit = defineEmits<{
+  checkout: [selection: Record<string, number>]
+}>()
+
+const titleId = useId()
 const MAX_PER_TYPE = 6
 
 // Cantidades seleccionadas, indexadas por ID de entrada.
-const quantities = ref<Record<string, number>>({})
+const quantities = ref<Record<string, number>>({ ...props.selection })
 
 // Calcula la cantidad seleccionada para un tipo.
 function quantityFor(ticket: TicketType): number {
@@ -23,33 +28,35 @@ function updateQuantity(ticket: TicketType, change: number) {
   const current = quantityFor(ticket)
   const maximum = Math.min(MAX_PER_TYPE, ticket.availableTickets)
 
-  quantities.value[ticket.id] = Math.max(
-    0,
-    Math.min(maximum, current + change),
-  )
+  quantities.value[ticket.id] = Math.max(0, Math.min(maximum, current + change))
 }
 
 // Total de entradas seleccionadas.
 const totalQuantity = computed(() =>
-  props.tickets.reduce(
-    (total, ticket) => total + quantityFor(ticket),
-    0,
-  ),
+  props.tickets.reduce((total, ticket) => total + quantityFor(ticket), 0),
 )
 
 // Importe total.
 const totalPrice = computed(() =>
-  props.tickets.reduce(
-    (total, ticket) =>
-      total + ticket.price * quantityFor(ticket),
-    0,
-  ),
+  props.tickets.reduce((total, ticket) => total + ticket.price * quantityFor(ticket), 0),
 )
+
+function handleCheckout() {
+  if (totalQuantity.value === 0) return
+
+  const selection = Object.fromEntries(
+    props.tickets
+      .filter((ticket) => quantityFor(ticket) > 0)
+      .map((ticket) => [ticket.id, quantityFor(ticket)]),
+  )
+
+  emit('checkout', selection)
+}
 </script>
 
 <template>
-  <section class="ticket-selector" aria-labelledby="ticket-selector-title">
-    <h2 id="ticket-selector-title">Seleccioná tus entradas</h2>
+  <section class="ticket-selector" :aria-labelledby="titleId">
+    <h2 :id="titleId">Seleccioná tus entradas</h2>
 
     <div
       v-for="ticket in tickets"
@@ -62,11 +69,7 @@ const totalPrice = computed(() =>
         <p v-if="ticket.description">{{ ticket.description }}</p>
         <strong>{{ formatPrice(ticket.price) }} ARS</strong>
         <span class="ticket-option__stock">
-          {{
-            ticket.availableTickets > 0
-              ? `${ticket.availableTickets} disponibles`
-              : 'Agotado'
-          }}
+          {{ ticket.availableTickets > 0 ? `${ticket.availableTickets} disponibles` : 'Agotado' }}
         </span>
       </div>
 
@@ -103,15 +106,15 @@ const totalPrice = computed(() =>
         <strong>{{ formatPrice(totalPrice) }} ARS</strong>
       </div>
 
-      <p v-if="totalQuantity > 0" class="auth-notice" role="status">
-        Para continuar con la compra necesitás iniciar sesión.
-        La autenticación estará disponible próximamente.
+      <p v-if="totalQuantity > 0" class="auth-notice">
+        Para continuar con la compra vas a necesitar iniciar sesión.
       </p>
 
       <button
         type="button"
         class="continue-button"
-        disabled
+        :disabled="totalQuantity === 0"
+        @click="handleCheckout"
       >
         Continuar con la compra
       </button>

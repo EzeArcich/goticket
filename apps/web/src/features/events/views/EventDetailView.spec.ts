@@ -1,8 +1,9 @@
-
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { mount, flushPromises } from '@vue/test-utils'
+import { mount, flushPromises, enableAutoUnmount } from '@vue/test-utils'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import EventDetailView from './EventDetailView.vue'
+
+enableAutoUnmount(afterEach)
 
 function createTestRouter() {
   return createRouter({
@@ -105,5 +106,20 @@ describe('EventDetailView', () => {
     const button = wrapper.get('.continue-button')
 
     expect(button.attributes('disabled')).toBeDefined()
+  })
+  it('conserva cantidades al abrir, cerrar y reabrir el modal', async () => {
+    const wrapper = await mountDetail('evt-001')
+    await wrapper.get('[aria-label="Agregar una entrada General"]').trigger('click')
+    await wrapper.get('.continue-button').trigger('click')
+    await flushPromises()
+    expect(document.querySelector('[role="dialog"]')).not.toBeNull()
+    document.querySelector<HTMLButtonElement>('.auth-close')!.click()
+    await flushPromises()
+    expect(document.querySelector('[role="dialog"]')).toBeNull()
+    expect(wrapper.get('output').text()).toBe('1')
+    await wrapper.get('.continue-button').trigger('click')
+    await flushPromises()
+    expect(document.querySelector('[role="dialog"]')).not.toBeNull()
+    expect(wrapper.get('output').text()).toBe('1')
   })
 })

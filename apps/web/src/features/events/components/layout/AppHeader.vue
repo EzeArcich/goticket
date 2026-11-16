@@ -18,8 +18,8 @@
       </nav>
 
       <div class="app-header__account">
-        <span title="Próximamente" class="app-header__login">Iniciar sesión</span>
-        <span title="Próximamente" class="app-header__register">Crear cuenta</span>
+        <RouterLink to="/login" class="app-header__login">Iniciar sesión</RouterLink>
+        <span title="Próximamente" class="app-header__register">Crear cuenta · Próximamente</span>
       </div>
     </div>
   </header>
@@ -102,8 +102,7 @@
 }
 
 @media (max-width: 700px) {
-  .app-header__nav,
-  .app-header__account {
+  .app-header__nav {
     display: none;
   }
 }
@@ -127,5 +126,15 @@
     flex-wrap: wrap;
     gap: 20px;
   }
+}
+@media (max-width: 700px) {
+  .app-header__account {
+    display: flex;
+    flex-wrap: wrap;
+    margin-left: 0;
+  }
+}
+.app-header a:focus-visible {
+  outline-color: #d9f06b;
 }
 </style>

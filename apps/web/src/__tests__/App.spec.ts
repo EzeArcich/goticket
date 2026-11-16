@@ -3,6 +3,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { nextTick } from 'vue'
 import App from '../App.vue'
+import LoginView from '../features/auth/views/LoginView.vue'
 import EventCatalogView from '../features/events/views/EventCatalogView.vue'
 import EventDetailPlaceholder from '../features/events/views/EventDetailPlaceholder.vue'
 import EventList from '../features/events/components/EventList.vue'
@@ -124,6 +125,7 @@ describe('home y rutas públicas', () => {
       history: createMemoryHistory(),
       routes: [
         { path: '/', name: 'catalog', component: EventCatalogView },
+        { path: '/login', name: 'login', component: LoginView, meta: { layout: 'auth' } },
         { path: '/eventos/:id', name: 'event-detail', component: EventDetailPlaceholder },
         { path: '/:pathMatch(.*)*', component: EventDetailPlaceholder },
       ],
@@ -133,6 +135,19 @@ describe('home y rutas públicas', () => {
     const wrapper = track(mount(App, { global: { plugins: [router] } }))
     return { wrapper, router }
   }
+  it('navega a login con layout independiente y vuelve al catálogo', async () => {
+    const { wrapper, router } = await app()
+    await wrapper.get('.app-header__login').trigger('click')
+    await flushPromises()
+    expect(router.currentRoute.value.path).toBe('/login')
+    expect(wrapper.find('.login-form').exists()).toBe(true)
+    expect(wrapper.find('.app-header').exists()).toBe(false)
+    expect(wrapper.find('footer').exists()).toBe(false)
+    await wrapper.get('.auth-brand').trigger('click')
+    await flushPromises()
+    expect(router.currentRoute.value.name).toBe('catalog')
+    expect(wrapper.find('.app-header').exists()).toBe(true)
+  })
   it('conserva la home, filtra desde categorías y navega al placeholder agotado', async () => {
     const { wrapper, router } = await app()
     expect(wrapper.text()).toContain('Próximos eventos')
