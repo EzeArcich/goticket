@@ -1,28 +1,39 @@
-
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { events } from '../data/events.mock'
 import { isPublicEvent } from '../../../utils/event-filters'
 import { useCatalogClock } from '../composables/useEventCatalog'
-import { formatPrice, formatEventDate } from '../../../utils/formatters'
+import { formatEventDate } from '../../../utils/formatters'
 import EventImage from '../components/EventImage.vue'
 import TicketSelector from '../components/TicketSelector.vue'
+import AuthModal from '../../auth/components/AuthModal.vue'
 
 const route = useRoute()
 const now = useCatalogClock()
+const showAuthModal = ref(false)
+const pendingSelection = ref<Record<string, number>>({})
 
 const event = computed(() =>
-  events.find(
-    (item) =>
-      item.id === route.params.id &&
-      isPublicEvent(item, now.value),
-  ),
+  events.find((item) => item.id === route.params.id && isPublicEvent(item, now.value)),
 )
+
+watch(
+  () => route.params.id,
+  () => {
+    showAuthModal.value = false
+    pendingSelection.value = {}
+  },
+)
+
+function handleCheckout(selection: Record<string, number>) {
+  pendingSelection.value = { ...selection }
+  showAuthModal.value = true
+}
 </script>
 
 <template>
-  <main class="event-detail">
+  <div class="event-detail">
     <template v-if="event">
       <RouterLink :to="{ name: 'catalog', hash: '#eventos' }" class="back-link">
         ← Volver a eventos
@@ -31,10 +42,7 @@ const event = computed(() =>
       <div class="event-layout">
         <section class="event-info">
           <div class="event-image">
-            <EventImage
-              :src="event.heroImageUrl || event.imageUrl"
-              :alt="event.title"
-            />
+            <EventImage :src="event.heroImageUrl || event.imageUrl" :alt="event.title" />
           </div>
 
           <span class="category">{{ event.category }}</span>
@@ -43,32 +51,33 @@ const event = computed(() =>
 
           <p class="event-date">{{ formatEventDate(event.date) }}</p>
 
-          <p class="event-location">
-            {{ event.location }} · {{ event.city }}
-          </p>
+          <p class="event-location">{{ event.location }} · {{ event.city }}</p>
 
-          <p class="event-organizer">
-            Organiza: {{ event.organizer.name }}
-          </p>
+          <p class="event-organizer">Organiza: {{ event.organizer.name }}</p>
 
           <h2>Acerca del evento</h2>
           <p>{{ event.description }}</p>
         </section>
 
         <aside class="tickets-panel">
-          <TicketSelector :tickets="event.ticketTypes" />
+          <TicketSelector
+            :key="event.id"
+            :tickets="event.ticketTypes"
+            :selection="pendingSelection"
+            @checkout="handleCheckout"
+          />
         </aside>
       </div>
+
+      <AuthModal :open="showAuthModal" @close="showAuthModal = false" />
     </template>
 
     <section v-else class="not-found">
       <h1>Evento no disponible</h1>
       <p>El evento no existe o no está publicado.</p>
-      <RouterLink :to="{ name: 'catalog' }">
-        Volver al catálogo
-      </RouterLink>
+      <RouterLink :to="{ name: 'catalog' }"> Volver al catálogo </RouterLink>
     </section>
-  </main>
+  </div>
 </template>
 
 <style scoped>

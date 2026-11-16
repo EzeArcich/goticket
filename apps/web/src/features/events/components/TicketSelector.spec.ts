@@ -1,4 +1,3 @@
-
 import { describe, expect, it } from 'vitest'
 import { mount } from '@vue/test-utils'
 import TicketSelector from './TicketSelector.vue'
@@ -81,11 +80,21 @@ describe('TicketSelector', () => {
     expect(addButton.attributes('disabled')).toBeDefined()
   })
 
-  it('no permite continuar con una compra real', () => {
+  it('deshabilita continuar sin entradas', () => {
     const wrapper = createWrapper()
 
     const continueButton = wrapper.get('.continue-button')
 
     expect(continueButton.attributes('disabled')).toBeDefined()
+  })
+  it('emite checkout con cantidades positivas sin crear compras', async () => {
+    const wrapper = createWrapper()
+    await wrapper.get('.continue-button').trigger('click')
+    expect(wrapper.emitted('checkout')).toBeUndefined()
+    await wrapper.get('[aria-label="Agregar una entrada General"]').trigger('click')
+    await wrapper.get('[aria-label="Agregar una entrada VIP"]').trigger('click')
+    expect(wrapper.get('.continue-button').attributes('disabled')).toBeUndefined()
+    await wrapper.get('.continue-button').trigger('click')
+    expect(wrapper.emitted('checkout')).toEqual([[{ general: 1, vip: 1 }]])
   })
 })

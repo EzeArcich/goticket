@@ -11,7 +11,13 @@ const router = createRouter({
     {
       path: '/eventos/:id',
       name: 'event-detail',
-     component: () => import('../features/events/views/EventDetailView.vue'),
+      component: () => import('../features/events/views/EventDetailView.vue'),
+    },
+    {
+      path: '/login',
+      name: 'login',
+      component: () => import('../features/auth/views/LoginView.vue'),
+      meta: { layout: 'auth' },
     },
     {
       path: '/:pathMatch(.*)*',
